@@ -10,26 +10,17 @@
 -------------------
 -- cards to do : --
 -------------------
--- Ritualist - When blind is selected, destroy the joker card to the right to add it's sell value to the count of sacrificed cards (max 10)
 -- Pactbearer - x0.2 mult per blood card in the deck
--- Blood cards : new enhancement which add twice the count of sacrificed cards to the chip value
--- Blood hand : if all played cards are blood cards, gain +10 mult +50 chips
 
-----------------
--- tarot cards :
-----------------
--- 1) The Pact - Enhances 2 selected cards to Blood cards
--- 2) The Ritual - Add 2 to the count of sacrificed cards
+-----------------
+-- Mechanics : --
+-----------------
+-- Blood hand : if all played cards are blood cards, gain +10 mult +50 chips
 
 ------------------
 -- planet cards :
 ------------------
 -- 1) Yuggoth - enhances Blood hand +5 mult + 25 chips
-
-------------------
--- Spectral cards :
-------------------
--- 1) Possession - Sacrifice 1 random card in your deck, but add a blood seal to 5 random cards instead
 
 ------------------
 -- Cult booster : Choose 1 between 2-3 cards of the Cult
@@ -46,8 +37,18 @@
 -- Martyr - When a blind is skipped, add 1 to the count of sacrificed cards, gain +2 mult
 -- Condemned - In 5 rounds, sacrifice this Joker. Add 5 to the count of sacrificed cards. +5 mult
 -- Soulbinder - when blind is selected, Sacrifice 1 consumable card and gain +5 mult
+-- Ritualist - When blind is selected, destroy the joker card to the right to add it's sell value to the count of sacrificed cards (max 10)
 -- Cult back
-
+----------------
+-- tarot cards :
+----------------
+-- 1) The Pact - Enhances 2 selected cards to Blood cards
+-- 2) The Ritual - Add 2 to the count of sacrificed cards
+-- Blood cards : new enhancement which add twice the count of sacrificed cards to the chip value
+------------------
+-- Spectral cards :
+------------------
+-- 1) Possession - Add a blood seal to 3 random cards instead
 ----------
 -- bugs:--
 ----------
@@ -59,6 +60,7 @@
 --------------
 -- Ajouter blueprint_compat + eternal_compat + perishable_compat
 -- Ajouter le nbr de SACRIFICED_CARDS
+-- Ajouter les mult même pour les cards qui en ont pas? (si holo par ex)
 
 ----------------------------------------------
 ------------ Utils --------------------------
@@ -236,7 +238,7 @@ SMODS.Joker({
 			}
 		end
 
-		if context.selling_card then
+		if context.selling_card and context.cardarea == G.jokers and SACRIFICED_CARDS > 24 then
 			local new_card = create_card(
 				"Joker", -- _type
 				G.jokers, -- area
@@ -444,9 +446,9 @@ SMODS.Joker({
 			local consumables_in_hand = {}
 
 			for k, v in pairs(G.consumeables.cards) do
-				-- print("h:", h)
-				-- if i.label then
-				-- 	print("label:", i.label)
+				-- print("k:", k)
+				-- if v.label then
+				-- 	print("label:", v.label)
 				-- else
 				-- 	print("label: (no label)")
 				-- end
@@ -480,7 +482,8 @@ SMODS.Joker({
 		text = {
 			"When blind is selected,",
 			"Destroy the joker to the right",
-			"Add it's sell value to the count of sacrificed cards",
+			"Add it's sell value to the count",
+			"of sacrificed cards (max 10)",
 		},
 	},
 	atlas = "Jokers",
@@ -494,14 +497,34 @@ SMODS.Joker({
 	},
 	calculate = function(self, card, context)
 		if context.setting_blind then
-			local deletable_jokers = {}
+			-- Debug
+			-- for k, v in pairs(G.jokers.cards) do
+			-- 	print("k:", k)
+			-- 	print("label", v.label)
+			-- 	print("cost:", v.sell_cost)
+			-- end
 
+			local ritualist_key = nil
 			for k, v in pairs(G.jokers.cards) do
-				print("k:", k)
-				if v.label then
-					print("label:", v.label)
-				else
-					print("label: (no label)")
+				if v.label == "j_thecult_Ritualist" then
+					ritualist_key = k
+					break
+				end
+			end
+
+			if ritualist_key then
+				--local right_joker_key = ritualist_key + 1
+				local right_joker = G.jokers.cards[ritualist_key + 1]
+
+				if right_joker then
+					local sell_value = right_joker.sell_cost
+					if sell_value > 10 then
+						sell_value = 10
+					end
+
+					right_joker:remove()
+
+					SACRIFICED_CARDS = SACRIFICED_CARDS + sell_value
 				end
 			end
 		end
@@ -517,11 +540,235 @@ SMODS.Joker({
 ----------------------------------------------
 ------------ Tarot cards ---------------------
 
+-- The Ritual
+SMODS.Atlas({
+	key = "Ritual",
+	path = "TheRitual.png",
+	px = 71,
+	py = 95,
+})
+
+SMODS.Consumable({
+	key = "Ritual",
+	set = "Tarot",
+	loc_txt = {
+		name = "The Ritual",
+		text = {
+			"Add 2 to the count of sacrificed cards",
+		},
+	},
+	atlas = "Ritual",
+	rarity = 1,
+	cost = 3,
+	unlocked = true,
+	discovered = true,
+	pos = {
+		x = 0,
+		y = 0,
+	},
+	can_use = function(self, card)
+		return true
+	end,
+	use = function(self, card)
+		SACRIFICED_CARDS = SACRIFICED_CARDS + 2
+		print("SACRIFICED_CARDS:", SACRIFICED_CARDS)
+	end,
+})
+
+-- The Pact
+SMODS.Atlas({
+	key = "Pact",
+	path = "ThePact.png",
+	px = 71,
+	py = 95,
+})
+
+SMODS.Consumable({
+	key = "Pact",
+	set = "Tarot",
+	config = {
+		-- How many cards can be selected.
+		max_highlighted = 1,
+		-- the key of the seal to change to
+		extra = "thecult_Blood_seal",
+	},
+	loc_vars = function(self, info_queue, card)
+		-- Handle creating a tooltip with seal args.
+		info_queue[#info_queue + 1] = G.P_SEALS[(card.ability or self.config).extra]
+		-- Description vars
+		return { vars = { (card.ability or self.config).max_highlighted } }
+	end,
+	loc_txt = {
+		name = "The Pact",
+		text = {
+			"Select {C:attention}#1#{} card to",
+			"apply {C:attention}Blood Seal{}",
+		},
+	},
+	atlas = "Pact",
+	rarity = 1,
+	cost = 4,
+	unlocked = true,
+	discovered = true,
+	pos = {
+		x = 0,
+		y = 0,
+	},
+	use = function(self, card, area, copier)
+		for i = 1, math.min(#G.hand.highlighted, card.ability.max_highlighted) do
+			G.E_MANAGER:add_event(Event({
+				func = function()
+					play_sound("tarot1")
+					card:juice_up(0.3, 0.5)
+					return true
+				end,
+			}))
+
+			G.E_MANAGER:add_event(Event({
+				trigger = "after",
+				delay = 0.1,
+				func = function()
+					G.hand.highlighted[i]:set_seal(card.ability.extra, nil, true)
+					return true
+				end,
+			}))
+
+			delay(0.5)
+		end
+		G.E_MANAGER:add_event(Event({
+			trigger = "after",
+			delay = 0.2,
+			func = function()
+				G.hand:unhighlight_all()
+				return true
+			end,
+		}))
+	end,
+})
+
 ----------------------------------------------
 ------------ Spectral cards ------------------
+SMODS.Atlas({
+	key = "Possession",
+	path = "Possession.png",
+	px = 71,
+	py = 95,
+})
+
+SMODS.Consumable({
+	key = "Possession",
+	set = "Spectral",
+	config = {
+		-- How many cards can be selected.
+		count = 3,
+		-- the key of the seal to change to
+		extra = "thecult_Blood_seal",
+	},
+	loc_vars = function(self, info_queue, card)
+		-- Handle creating a tooltip with seal args.
+		info_queue[#info_queue + 1] = G.P_SEALS[(card.ability or self.config).extra]
+		-- Description vars
+		return { vars = { (card.ability or self.config).count } }
+	end,
+	loc_txt = {
+		name = "Possession",
+		text = {
+			"Apply {C:attention}Blood Seal{}",
+			"to #1# random cards",
+		},
+	},
+	atlas = "Possession",
+	rarity = 3,
+	cost = 9,
+	unlocked = true,
+	discovered = true,
+	pos = {
+		x = 0,
+		y = 0,
+	},
+	can_use = function(self, card)
+		if G.hand then
+			return true
+		end
+		return false
+	end,
+	use = function(self, card)
+		G.E_MANAGER:add_event(Event({
+			trigger = "after",
+			delay = 0.4,
+			func = function()
+				play_sound("tarot1")
+				card:juice_up(0.3, 0.5)
+				return true
+			end,
+		}))
+
+		local selected_cards = {}
+
+		for i = 1, card.ability.count do
+			G.E_MANAGER:add_event(Event({
+				trigger = "after",
+				delay = 0.2,
+				func = function()
+					local random_card
+					repeat
+						random_card = pseudorandom_element(G.hand.cards, pseudoseed("possession"))
+					until random_card and not selected_cards[random_card]
+
+					if random_card then
+						random_card:set_seal(card.ability.extra, nil, true)
+						selected_cards[random_card] = true
+					end
+					return true
+				end,
+			}))
+		end
+	end,
+})
+
+----------------------------------------------
+------------ Blood seal ----------------------
+SMODS.Atlas({
+	key = "Bloodseal",
+	path = "BloodSeal.png",
+	px = 71,
+	py = 95,
+})
+
+SMODS.Seal({
+	name = "Blood Seal",
+	key = "Blood_seal",
+	badge_colour = HEX("e31b1b"),
+	sound = { sound = "gold_seal", per = 0.8, vol = 1 },
+	config = { chips = 0 },
+	loc_txt = {
+		label = "Blood Seal",
+		name = "Blood Seal",
+		text = { "Add twice the count", "of sacrificed cards", "to the chip value" },
+	},
+	loc_vars = function(self, info_queue)
+		return {
+			vars = self.config.chips,
+		}
+	end,
+	atlas = "Bloodseal",
+	pos = {
+		x = 0,
+		y = 0,
+	},
+	calculate = function(self, card, context)
+		if context.main_scoring and context.cardarea == G.play then
+			return {
+				chips = SACRIFICED_CARDS * 2,
+			}
+		end
+	end,
+})
 
 ----------------------------------------------
 ------------ Blood hand ----------------------
+
+-- https://github.com/Steamodded/examples/blob/master/Mods/RoyalFlush/RoyalFlush.lua
 
 ----------------------------------------------
 ------------ Booster -------------------------
