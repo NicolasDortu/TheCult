@@ -7,54 +7,16 @@
 ----------------------------------------------
 ------------MOD CODE -------------------------
 
--------------------
--- cards to do : --
--------------------
--- Pactbearer - x0.2 mult per blood card in the deck
-
------------------
--- Mechanics : --
------------------
--- Blood hand : if all played cards are blood cards, gain +10 mult +50 chips
-
-------------------
--- planet cards :
-------------------
--- 1) Yuggoth - enhances Blood hand +5 mult + 25 chips
-
 ------------------
 -- Cult booster : Choose 1 between 2-3 cards of the Cult
 ------------------
 
-------------------
--- Cards done : --
-------------------
--- Cultist - When blind is selected, summon 1 Joker. At the end of each round, sacrifice all Jokers.
--- Sacrificer - Gain x0.1 mult per sacrificed card
--- The Forgotten - carte pêtée X10 mult negative
--- Lamb - If you have at least 25 sacrificed cards, sell this card to summon The Forgotten
--- Heretic - When blind is selected, Reduce the count of sacrificed cards by 1 and gain x0.2 mult
--- Martyr - When a blind is skipped, add 1 to the count of sacrificed cards, gain +2 mult
--- Condemned - In 5 rounds, sacrifice this Joker. Add 5 to the count of sacrificed cards. +5 mult
--- Soulbinder - when blind is selected, Sacrifice 1 consumable card and gain +5 mult
--- Ritualist - When blind is selected, destroy the joker card to the right to add it's sell value to the count of sacrificed cards (max 10)
--- Cult back
-----------------
--- tarot cards :
-----------------
--- 1) The Pact - Enhances 2 selected cards to Blood cards
--- 2) The Ritual - Add 2 to the count of sacrificed cards
--- Blood cards : new enhancement which add twice the count of sacrificed cards to the chip value
-------------------
--- Spectral cards :
-------------------
--- 1) Possession - Add a blood seal to 3 random cards instead
 ----------
 -- bugs:--
 ----------
 -- Seems like new run doesn't reset the sacrificed card
 -- Mult not updated before a tick from the game
-
+-- Les face cards ne sont pas des int -> convertir Jack, Queen, King en 10
 --------------
 -- Upgrades --
 --------------
@@ -65,7 +27,7 @@
 ----------------------------------------------
 ------------ Utils --------------------------
 SACRIFICED_CARDS = 0
-
+BLOOD_FLUSH_LEVEL = 0
 ----------------------------------------------
 ------------ Jokers --------------------------
 
@@ -537,6 +499,54 @@ SMODS.Joker({
 	end,
 })
 
+-- Pactbearer
+SMODS.Joker({
+	key = "Pactbearer",
+	loc_txt = {
+		name = "Pactbearer",
+		text = {
+			"{X:mult,C:white}X1{} Mult per blood card in hand played",
+		},
+	},
+	atlas = "Jokers",
+	rarity = 3,
+	cost = 8,
+	unlocked = true,
+	discovered = true,
+	pos = {
+		x = 4,
+		y = 1,
+	},
+	config = {
+		extra = {
+			Xmult = 1,
+		},
+	},
+	calculate = function(self, card, context)
+		if context.scoring_hand and #context.scoring_hand > 0 then
+			local blood_count = 0
+
+			-- Iterate over the played hand and count blood cards
+			for _, played_card in pairs(context.scoring_hand) do
+				if played_card.seal == "thecult_Blood_seal" then
+					blood_count = blood_count + 1
+				end
+			end
+
+			-- Update Xmult based on the blood count
+			card.ability.extra.Xmult = 1 + blood_count
+
+			if context.joker_main then
+				return {
+					card = card,
+					Xmult_mod = card.ability.extra.Xmult,
+					message = "X" .. card.ability.extra.Xmult,
+					colour = G.C.MULT,
+				}
+			end
+		end
+	end,
+})
 ----------------------------------------------
 ------------ Tarot cards ---------------------
 
@@ -766,9 +776,76 @@ SMODS.Seal({
 })
 
 ----------------------------------------------
------------- Blood hand ----------------------
+------------ Blood flush ----------------------
 
--- https://github.com/Steamodded/examples/blob/master/Mods/RoyalFlush/RoyalFlush.lua
+SMODS.PokerHand({
+	key = "Blood_flush",
+	chips = 100,
+	mult = 10,
+	l_mult = 5,
+	l_chips = 50,
+	visible = false,
+	loc_txt = {
+
+		name = "Blood Flush",
+		description = {
+			"5 cards with a Blood Seal",
+		},
+	},
+	example = {
+		{ "S_2", true },
+		{ "H_J", true },
+		{ "D_8", true },
+		{ "H_K", true },
+		{ "C_3", true },
+	},
+
+	evaluate = function(parts, hand)
+		local count = 0
+		local total_value = 0
+		for _, card in ipairs(hand) do
+			if card.seal == "thecult_Blood_seal" then
+				count = count + 1
+				total_value = total_value + card.base.value
+			end
+		end
+		if count == 5 then
+			return { hand, total_value }
+		end
+	end,
+})
+
+-- Yuggoth planet card
+SMODS.Atlas({
+	key = "Yuggoth",
+	path = "Yuggoth.png",
+	px = 71,
+	py = 95,
+})
+
+SMODS.Consumable({
+	set = "Planet",
+	key = "Yuggoth",
+	rarity = 2,
+	cost = 4,
+	unlocked = true,
+	config = { hand_type = "thecult_Blood_flush" },
+	pos = { x = 0, y = 0 },
+	atlas = "Yuggoth",
+	set_card_type_badge = function(self, card, badges)
+		badges[1] = create_badge(localize("k_planet_q"), get_type_colour(self or card.config, card), nil, 1.2)
+	end,
+	process_loc_text = function(self)
+		--use another planet's loc txt instead
+		local target_text = G.localization.descriptions[self.set]["c_mercury"].text
+		SMODS.Consumable.process_loc_text(self)
+		G.localization.descriptions[self.set][self.key].text = target_text
+	end,
+	generate_ui = 0,
+	loc_txt = {
+		name = "Yuggoth",
+	},
+})
 
 ----------------------------------------------
 ------------ Booster -------------------------
