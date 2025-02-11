@@ -7,27 +7,24 @@
 ----------------------------------------------
 ------------MOD CODE -------------------------
 
-------------------
--- Cult booster : Choose 1 between 2-3 cards of the Cult
-------------------
-
 ----------
 -- bugs:--
 ----------
 -- Seems like new run doesn't reset the sacrificed card
 -- Mult not updated before a tick from the game
--- Les face cards ne sont pas des int -> convertir Jack, Queen, King en 10
+-- Blood flush : Les face cards ne sont pas des int -> convertir Jack, Queen, King en 10
 --------------
 -- Upgrades --
 --------------
 -- Ajouter blueprint_compat + eternal_compat + perishable_compat
 -- Ajouter le nbr de SACRIFICED_CARDS
 -- Ajouter les mult même pour les cards qui en ont pas? (si holo par ex)
+-- Booster pack :  Ajouter logique pour pas reprendre deux fois le même
+-- Booster pack : texte ERROR quand il faut choisir
 
 ----------------------------------------------
------------- Utils --------------------------
+------------ Init ----------------------------
 SACRIFICED_CARDS = 0
-BLOOD_FLUSH_LEVEL = 0
 ----------------------------------------------
 ------------ Jokers --------------------------
 
@@ -43,10 +40,13 @@ SMODS.Joker({
 	key = "Sacrificer",
 	loc_txt = {
 		name = "Sacrificer",
-		text = { "{X:mult,C:white}X0.1{} Mult per sacrificed card", "[Currently {X:mult,C:white}X#1#{} Mult]" },
+		text = {
+			"{X:mult,C:white}X0.1{} Mult per sacrificed card",
+			"{C:inactive}[Currently{} {X:mult,C:white}X#1#{} {C:inactive}Mult]{}",
+		},
 	},
 	atlas = "Jokers",
-	rarity = 1, -- rarity: 1 = Common, 2 = Uncommon, 3 = Rare, 4 = Legendary
+	rarity = 3, -- rarity: 1 = Common, 2 = Uncommon, 3 = Rare, 4 = Legendary
 	cost = 5, -- cost
 	unlocked = true, -- where it is unlocked or not: if true,
 	discovered = true, -- whether or not it starts discovered
@@ -141,7 +141,7 @@ SMODS.Joker({
 	key = "TheForgotten",
 	loc_txt = {
 		name = "The Forgotten",
-		text = { "The jaws that bite, the claws that catch!", "[{X:mult,C:white}X10{} Mult]" },
+		text = { "The jaws that bite", "the claws that catch!", "{X:mult,C:white}X6{} Mult" },
 	},
 	atlas = "Jokers",
 	rarity = 4,
@@ -154,7 +154,7 @@ SMODS.Joker({
 	},
 	config = {
 		extra = {
-			Xmult = 10,
+			Xmult = 6,
 		},
 	},
 	loc_vars = function(self, info_queue, center)
@@ -229,7 +229,7 @@ SMODS.Joker({
 			"When blind is selected,",
 			"Reduce the count of sacrificed cards by 1",
 			"Gain {X:mult,C:white}X0.2{} Mult",
-			"[Currently {X:mult,C:white}X#1#{} Mult]",
+			"{C:inactive}[Currently{} {X:mult,C:white}X#1#{} {C:inactive}Mult]{}",
 		},
 	},
 	atlas = "Jokers",
@@ -284,11 +284,11 @@ SMODS.Joker({
 			"When blind is skipped,",
 			"Increase the count of sacrificed cards by 1",
 			"Gain {C:red}+2{} Mult",
-			"[Currently {C:red}+#1#{} Mult]",
+			"{C:inactive}[Currently{} {C:red}+#1#{} {C:inactive}Mult]{}",
 		},
 	},
 	atlas = "Jokers",
-	rarity = 1,
+	rarity = 2,
 	cost = 5,
 	unlocked = true,
 	discovered = true,
@@ -381,7 +381,7 @@ SMODS.Joker({
 			"When blind is selected,",
 			"Sacrifice 1 random consumable card",
 			"Gain {C:red}+2{} Mult",
-			"[Currently {C:red}+#1#{} Mult]",
+			"{C:inactive}[Currently{} {C:red}+#1#{} {C:inactive}Mult]{}",
 		},
 	},
 	atlas = "Jokers",
@@ -408,12 +408,6 @@ SMODS.Joker({
 			local consumables_in_hand = {}
 
 			for k, v in pairs(G.consumeables.cards) do
-				-- print("k:", k)
-				-- if v.label then
-				-- 	print("label:", v.label)
-				-- else
-				-- 	print("label: (no label)")
-				-- end
 				table.insert(consumables_in_hand, v)
 			end
 
@@ -616,7 +610,7 @@ SMODS.Consumable({
 		},
 	},
 	atlas = "Pact",
-	rarity = 1,
+	rarity = 2,
 	cost = 4,
 	unlocked = true,
 	discovered = true,
@@ -849,19 +843,68 @@ SMODS.Consumable({
 
 ----------------------------------------------
 ------------ Booster -------------------------
-
+SMODS.Atlas({
+	key = "BoosterCult",
+	path = "BoosterCult.png",
+	px = 71,
+	py = 95,
+})
+SMODS.Booster({
+	key = "BoosterCult",
+	atlas = "BoosterCult",
+	cost = 5,
+	unlocked = true,
+	discovered = true,
+	pos = {
+		x = 0,
+		y = 0,
+	},
+	loc_txt = {
+		name = "Cult Booster",
+		text = { "Choose {C:attention}1{} of up to", "{C:attention}2{} Jokers of The Cult" },
+	},
+	weight = 2,
+	config = { extra = 2, choose = 1 }, -- Allow choosing 1 out of 2 cards
+	-- TODO : Ajouter logique pour pas reprendre deux fois le même
+	create_card = function(self, card, i)
+		-- Get a random card from "The Cult" set
+		local cult_cards = {
+			"j_thecult_Cultist",
+			"j_thecult_Lamb",
+			"j_thecult_Sacrificer",
+			"j_thecult_Heretic",
+			"j_thecult_Martyr",
+			"j_thecult_Condemned",
+			"j_thecult_Soulbinder",
+			"j_thecult_Ritualist",
+			"j_thecult_Pactbearer",
+		}
+		local random_index = math.random(1, #cult_cards)
+		local random_card_key = cult_cards[random_index]
+		return SMODS.create_card({ key = random_card_key })
+	end,
+	select_card = function(self, card) end,
+	loc_vars = function(self, info_queue, card)
+		return { vars = { self.config.choose, self.config.extra } }
+	end,
+})
 ----------------------------------------------
 ------------ New Back ------------------------
+SMODS.Atlas({
+	key = "CultBack",
+	path = "CultBack.png",
+	px = 71,
+	py = 95,
+})
+
 SMODS.Back({
 	name = "The Cult",
 	key = "BackTheCult",
+	atlas = "CultBack",
 	pos = {
 		x = 0,
-		y = 3,
+		y = 0,
 	},
-	-- config = {
-	--     polyglass = true
-	-- },
 	loc_txt = {
 		name = "The Cult",
 		text = { "Start with 1 {C:attention}Cultist{}" },
