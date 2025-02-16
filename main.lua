@@ -1,32 +1,101 @@
---- STEAMODDED HEADER
---- MOD_NAME: The Cult
---- MOD_ID: THECULT
---- MOD_AUTHOR: [Nico]
---- MOD_DESCRIPTION: May the blood free us from our sins
---- PREFIX: thecult
 ----------------------------------------------
-------------MOD CODE -------------------------
+------------ MOD CODE ------------------------
+----------------------------------------------
 
-----------
--- bugs:--
-----------
--- Seems like new run doesn't reset the sacrificed card
--- Mult not updated before a tick from the game
--- Blood flush : Les face cards ne sont pas des int -> convertir Jack, Queen, King en 10
---------------
--- Upgrades --
---------------
--- Ajouter blueprint_compat + eternal_compat + perishable_compat
--- Ajouter le nbr de SACRIFICED_CARDS
--- Ajouter les mult même pour les cards qui en ont pas? (si holo par ex)
--- Booster pack :  Ajouter logique pour pas reprendre deux fois le même
--- Booster pack : texte ERROR quand il faut choisir
+--------------------
+-- Upgrades to do --
+--------------------
+-- Add blueprint_compat + eternal_compat + perishable_compat
 
 ----------------------------------------------
 ------------ Init ----------------------------
-SACRIFICED_CARDS = 0
+----------------------------------------------
+
+-- Load the path to the mod directory
+local modsPath = love.filesystem.getSaveDirectory() .. "/Mods/"
+local sacrificeFilePath = modsPath .. "TheCult/sacrificecount.txt"
+
+SACRIFICED_CARDS = 0 -- Default value
+
+-- Function to create sacrificecount.txt if it doesn't exist
+local function create_sacrifice_count()
+	if not io.open(sacrificeFilePath, "r") then -- Check if file exists
+		local file = io.open(sacrificeFilePath, "w")
+		if file then
+			file:write("0")
+			file:close()
+			print("File created")
+		else
+			print("Error creating file!")
+		end
+	else
+		print("The file already exists") -- File exists, do nothing
+	end
+end
+
+create_sacrifice_count()
+
+-- Function to read sacrifice count
+local function read_sacrifice_count()
+	local file = io.open(sacrificeFilePath, "r")
+	if file then
+		local content = file:read("*all")
+		file:close()
+		local count = tonumber(content)
+		if count then
+			return count
+		end
+	else
+		print("File not found")
+	end
+	return 0
+end
+
+-- Function to write sacrifice count
+local function write_sacrifice_count(count)
+	local file = io.open(sacrificeFilePath, "w")
+	if file then
+		file:write(tostring(count))
+		file:close()
+		--print("Sacrifice count updated:", count)
+	else
+		print("Error writing to file!")
+	end
+end
+
+-- Initialize SACRIFICED_CARDS
+SACRIFICED_CARDS = read_sacrifice_count()
+
+-- Event for updating the sacrifice count (for saving the value when the game is restarted)
+local event
+event = Event({
+	blockable = false,
+	blocking = false,
+	pause_force = true,
+	no_delete = true,
+	trigger = "after",
+	delay = 5,
+	func = function()
+		local new_count = read_sacrifice_count()
+
+		-- If the file count is different, update and write it
+		if new_count ~= SACRIFICED_CARDS then
+			new_count = SACRIFICED_CARDS
+			write_sacrifice_count(SACRIFICED_CARDS)
+		end
+
+		event.start_timer = false
+	end,
+})
+
+G.E_MANAGER:add_event(event)
+
+-- code injection for resseting the SACRIFICED_CARDS when new run
+dofile(modsPath .. "TheCult/injector.lua")
+
 ----------------------------------------------
 ------------ Jokers --------------------------
+----------------------------------------------
 
 SMODS.Atlas({
 	key = "Jokers",
@@ -61,7 +130,7 @@ SMODS.Joker({
 	},
 	loc_vars = function(self, info_queue, center)
 		return {
-			vars = { center.ability.extra.Xmult },
+			vars = { (1 + (0.1 * SACRIFICED_CARDS)) },
 		}
 	end,
 	calculate = function(self, card, context)
@@ -90,6 +159,7 @@ SMODS.Joker({
 			"summon 1 {C:attention}Joker{}",
 			"At the end of each round,",
 			"sacrifice all {C:attention}Joker{}",
+			"{C:inactive}[Currently #1# Sacrifices]{}",
 		},
 	},
 	atlas = "Jokers",
@@ -103,6 +173,9 @@ SMODS.Joker({
 	},
 	loc_vars = function(self, info_queue, center)
 		info_queue[#info_queue + 1] = G.P_CENTERS.j_joker
+		return {
+			vars = { SACRIFICED_CARDS },
+		}
 	end,
 	calculate = function(self, card, context)
 		if context.joker_main then
@@ -141,7 +214,7 @@ SMODS.Joker({
 	key = "TheForgotten",
 	loc_txt = {
 		name = "The Forgotten",
-		text = { "The jaws that bite", "the claws that catch!", "{X:mult,C:white}X6{} Mult" },
+		text = { "The jaws that bite", "the claws that catch!", "{X:mult,C:white}X6.66{} Mult" },
 	},
 	atlas = "Jokers",
 	rarity = 4,
@@ -154,7 +227,7 @@ SMODS.Joker({
 	},
 	config = {
 		extra = {
-			Xmult = 6,
+			Xmult = 6.66,
 		},
 	},
 	loc_vars = function(self, info_queue, center)
@@ -179,7 +252,11 @@ SMODS.Joker({
 	key = "Lamb",
 	loc_txt = {
 		name = "Lamb",
-		text = { "If you have at least 25 sacrificed cards", "sell this card to summon {C:attention}The Forgotten{}" },
+		text = {
+			"If you have at least 25 sacrificed cards",
+			"sell this card to summon {C:attention}The Forgotten{}",
+			"{C:inactive}[Currently #1# Sacrifices]{}",
+		},
 	},
 	atlas = "Jokers",
 	rarity = 1,
@@ -192,6 +269,9 @@ SMODS.Joker({
 	},
 	loc_vars = function(self, info_queue, center)
 		info_queue[#info_queue + 1] = G.P_CENTERS.j_thecult_TheForgotten
+		return {
+			vars = { SACRIFICED_CARDS },
+		}
 	end,
 	calculate = function(self, card, context)
 		if context.joker_main then
@@ -252,11 +332,6 @@ SMODS.Joker({
 		}
 	end,
 	calculate = function(self, card, context)
-		-- print("calculate called")
-		-- print("context.setting_blind:", context.setting_blind)
-		-- print("SACRIFICED_CARDS:", SACRIFICED_CARDS)
-		-- print("Initial Xmult:", card.ability.extra.Xmult)
-
 		if context.setting_blind then
 			if SACRIFICED_CARDS > 0 then
 				SACRIFICED_CARDS = SACRIFICED_CARDS - 1
@@ -440,6 +515,7 @@ SMODS.Joker({
 			"Destroy the joker to the right",
 			"Add it's sell value to the count",
 			"of sacrificed cards (max 10)",
+			"{C:inactive}[Currently #1# Sacrifices]{}",
 		},
 	},
 	atlas = "Jokers",
@@ -451,15 +527,13 @@ SMODS.Joker({
 		x = 3,
 		y = 1,
 	},
+	loc_vars = function(self, info_queue, center)
+		return {
+			vars = { SACRIFICED_CARDS },
+		}
+	end,
 	calculate = function(self, card, context)
 		if context.setting_blind then
-			-- Debug
-			-- for k, v in pairs(G.jokers.cards) do
-			-- 	print("k:", k)
-			-- 	print("label", v.label)
-			-- 	print("cost:", v.sell_cost)
-			-- end
-
 			local ritualist_key = nil
 			for k, v in pairs(G.jokers.cards) do
 				if v.label == "j_thecult_Ritualist" then
@@ -541,8 +615,10 @@ SMODS.Joker({
 		end
 	end,
 })
+
 ----------------------------------------------
 ------------ Tarot cards ---------------------
+----------------------------------------------
 
 -- The Ritual
 SMODS.Atlas({
@@ -558,7 +634,8 @@ SMODS.Consumable({
 	loc_txt = {
 		name = "The Ritual",
 		text = {
-			"Add 2 to the count of sacrificed cards",
+			"Add {C:attention}2{} to the count of sacrificed cards",
+			"{C:inactive}[Currently #1# Sacrifices]{}",
 		},
 	},
 	atlas = "Ritual",
@@ -570,12 +647,17 @@ SMODS.Consumable({
 		x = 0,
 		y = 0,
 	},
+	loc_vars = function(self, info_queue, center)
+		return {
+			vars = { SACRIFICED_CARDS },
+		}
+	end,
 	can_use = function(self, card)
 		return true
 	end,
 	use = function(self, card)
 		SACRIFICED_CARDS = SACRIFICED_CARDS + 2
-		print("SACRIFICED_CARDS:", SACRIFICED_CARDS)
+		--print("SACRIFICED_CARDS:", SACRIFICED_CARDS)
 	end,
 })
 
@@ -652,6 +734,8 @@ SMODS.Consumable({
 
 ----------------------------------------------
 ------------ Spectral cards ------------------
+----------------------------------------------
+
 SMODS.Atlas({
 	key = "Possession",
 	path = "Possession.png",
@@ -732,6 +816,8 @@ SMODS.Consumable({
 
 ----------------------------------------------
 ------------ Blood seal ----------------------
+----------------------------------------------
+
 SMODS.Atlas({
 	key = "Bloodseal",
 	path = "BloodSeal.png",
@@ -748,11 +834,16 @@ SMODS.Seal({
 	loc_txt = {
 		label = "Blood Seal",
 		name = "Blood Seal",
-		text = { "Add twice the count", "of sacrificed cards", "to the chip value" },
+		text = {
+			"Add twice the count",
+			"of sacrificed cards",
+			"to the chip value",
+			"{C:inactive}[Currently #2# Sacrifices]{}",
+		},
 	},
 	loc_vars = function(self, info_queue)
 		return {
-			vars = self.config.chips,
+			vars = { self.config.chips, SACRIFICED_CARDS },
 		}
 	end,
 	atlas = "Bloodseal",
@@ -770,7 +861,8 @@ SMODS.Seal({
 })
 
 ----------------------------------------------
------------- Blood flush ----------------------
+------------ Blood flush ---------------------
+----------------------------------------------
 
 SMODS.PokerHand({
 	key = "Blood_flush",
@@ -800,7 +892,13 @@ SMODS.PokerHand({
 		for _, card in ipairs(hand) do
 			if card.seal == "thecult_Blood_seal" then
 				count = count + 1
-				total_value = total_value + card.base.value
+				local value = card.base.value
+				if value == "Jack" or value == "Queen" or value == "King" then
+					value = 10
+				elseif value == "Ace" then
+					value = 11
+				end
+				total_value = total_value + value
 			end
 		end
 		if count == 5 then
@@ -843,6 +941,8 @@ SMODS.Consumable({
 
 ----------------------------------------------
 ------------ Booster -------------------------
+----------------------------------------------
+
 SMODS.Atlas({
 	key = "BoosterCult",
 	path = "BoosterCult.png",
@@ -852,6 +952,7 @@ SMODS.Atlas({
 SMODS.Booster({
 	key = "BoosterCult",
 	atlas = "BoosterCult",
+	group_key = "k_buffoon_pack",
 	cost = 5,
 	unlocked = true,
 	discovered = true,
@@ -865,31 +966,64 @@ SMODS.Booster({
 	},
 	weight = 2,
 	config = { extra = 2, choose = 1 }, -- Allow choosing 1 out of 2 cards
-	-- TODO : Ajouter logique pour pas reprendre deux fois le même
 	create_card = function(self, card, i)
-		-- Get a random card from "The Cult" set
+		-- Get a random Joker from "The Cult" set with weights
 		local cult_cards = {
-			"j_thecult_Cultist",
-			"j_thecult_Lamb",
-			"j_thecult_Sacrificer",
-			"j_thecult_Heretic",
-			"j_thecult_Martyr",
-			"j_thecult_Condemned",
-			"j_thecult_Soulbinder",
-			"j_thecult_Ritualist",
-			"j_thecult_Pactbearer",
+			{ key = "j_thecult_Cultist", weight = 3 },
+			{ key = "j_thecult_Lamb", weight = 3 },
+			{ key = "j_thecult_Sacrificer", weight = 1 },
+			{ key = "j_thecult_Heretic", weight = 2 },
+			{ key = "j_thecult_Martyr", weight = 2 },
+			{ key = "j_thecult_Condemned", weight = 3 },
+			{ key = "j_thecult_Soulbinder", weight = 1 },
+			{ key = "j_thecult_Ritualist", weight = 3 },
+			{ key = "j_thecult_Pactbearer", weight = 1 },
 		}
-		local random_index = math.random(1, #cult_cards)
-		local random_card_key = cult_cards[random_index]
-		return SMODS.create_card({ key = random_card_key })
+
+		-- Function to select a card based on weights
+		local function weighted_random(cards)
+			local total_weight = 0
+			for _, card in ipairs(cards) do
+				total_weight = total_weight + card.weight
+			end
+
+			local random_weight = math.random() * total_weight
+			for _, card in ipairs(cards) do
+				random_weight = random_weight - card.weight
+				if random_weight <= 0 then
+					return card.key
+				end
+			end
+		end
+
+		-- Keep track of proposed cards to avoid duplicates
+		self.proposed_cards = self.proposed_cards or {}
+		local available_cards = {}
+		for _, card in ipairs(cult_cards) do
+			if not self.proposed_cards[card.key] then
+				table.insert(available_cards, card)
+			end
+		end
+
+		if #available_cards == 0 then
+			-- Reset proposed cards if all have been proposed
+			self.proposed_cards = {}
+			available_cards = cult_cards
+		end
+
+		local random_card_key = weighted_random(available_cards)
+		self.proposed_cards[random_card_key] = true
+
+		return { key = random_card_key, set = "Joker", area = G.pack_cards, skip_materialize = true }
 	end,
 	select_card = function(self, card) end,
-	loc_vars = function(self, info_queue, card)
-		return { vars = { self.config.choose, self.config.extra } }
-	end,
+	loc_vars = pack_loc_vars,
 })
+
 ----------------------------------------------
------------- New Back ------------------------
+-------------- Back --------------------------
+----------------------------------------------
+
 SMODS.Atlas({
 	key = "CultBack",
 	path = "CultBack.png",
@@ -938,3 +1072,4 @@ SMODS.Back({
 
 ----------------------------------------------
 ------------MOD CODE END----------------------
+----------------------------------------------

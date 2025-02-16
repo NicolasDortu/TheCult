@@ -1,0 +1,8 @@
+{
+	"id": "THECULT",
+	"name": "The Cult",
+	"author": ["Nico"],
+	"description": "May the blood free us from our sins.",
+	"prefix": "thecult",
+	"main_file": "main.lua"
+}
