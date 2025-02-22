@@ -110,7 +110,7 @@ SMODS.Joker({
 	loc_txt = {
 		name = "Sacrificer",
 		text = {
-			"{X:mult,C:white}X0.1{} Mult per sacrificed card",
+			"{X:mult,C:white}X0.1{} Mult per {C:red}Sacrifices{}",
 			"{C:inactive}[Currently{} {X:mult,C:white}X#1#{} {C:inactive}Mult]{}",
 		},
 	},
@@ -120,8 +120,8 @@ SMODS.Joker({
 	unlocked = true, -- where it is unlocked or not: if true,
 	discovered = true, -- whether or not it starts discovered
 	pos = {
-		x = 0,
-		y = 0,
+		x = 2,
+		y = 1,
 	},
 	config = {
 		extra = {
@@ -156,9 +156,9 @@ SMODS.Joker({
 		name = "Cultist",
 		text = {
 			"When blind is selected,",
-			"summon 1 {C:attention}Joker{}",
-			"At the end of each round,",
-			"sacrifice all {C:attention}Joker{}",
+			"summon a {C:attention}Joker{}",
+			"At the end of the round,",
+			"{C:red}Sacrifice{} all {C:attention}Joker{}",
 			"{C:inactive}[Currently #1# Sacrifices]{}",
 		},
 	},
@@ -214,7 +214,11 @@ SMODS.Joker({
 	key = "TheForgotten",
 	loc_txt = {
 		name = "The Forgotten",
-		text = { "The jaws that bite", "the claws that catch!", "{X:mult,C:white}X6.66{} Mult" },
+		text = {
+			"{C:red}That is not dead which can eternal lie,{}",
+			"{C:red}and with strange aeons even death may die{}",
+			"{X:mult,C:white}X6.66{} Mult",
+		},
 	},
 	atlas = "Jokers",
 	rarity = 4,
@@ -222,8 +226,8 @@ SMODS.Joker({
 	unlocked = false,
 	discovered = false,
 	pos = {
-		x = 2,
-		y = 0,
+		x = 4,
+		y = 1,
 	},
 	config = {
 		extra = {
@@ -253,7 +257,7 @@ SMODS.Joker({
 	loc_txt = {
 		name = "Lamb",
 		text = {
-			"If you have at least 25 sacrificed cards",
+			"If you have at least {C:attention}25{} {C:red}Sacrifices{}",
 			"sell this card to summon {C:attention}The Forgotten{}",
 			"{C:inactive}[Currently #1# Sacrifices]{}",
 		},
@@ -307,7 +311,7 @@ SMODS.Joker({
 		name = "Heretic",
 		text = {
 			"When blind is selected,",
-			"Reduce the count of sacrificed cards by 1",
+			"Reduce the count of {C:red}Sacrifices{} by {C:attention}1{}",
 			"Gain {X:mult,C:white}X0.2{} Mult",
 			"{C:inactive}[Currently{} {X:mult,C:white}X#1#{} {C:inactive}Mult]{}",
 		},
@@ -318,7 +322,7 @@ SMODS.Joker({
 	unlocked = true,
 	discovered = true,
 	pos = {
-		x = 4,
+		x = 2,
 		y = 0,
 	},
 	config = {
@@ -357,7 +361,7 @@ SMODS.Joker({
 		name = "Martyr",
 		text = {
 			"When blind is skipped,",
-			"Increase the count of sacrificed cards by 1",
+			"Increase the count of {C:red}Sacrifices{} by {C:attention}1{}",
 			"Gain {C:red}+2{} Mult",
 			"{C:inactive}[Currently{} {C:red}+#1#{} {C:inactive}Mult]{}",
 		},
@@ -368,8 +372,8 @@ SMODS.Joker({
 	unlocked = true,
 	discovered = true,
 	pos = {
-		x = 0,
-		y = 1,
+		x = 4,
+		y = 0,
 	},
 	config = {
 		extra = {
@@ -403,7 +407,12 @@ SMODS.Joker({
 	key = "Condemned",
 	loc_txt = {
 		name = "Condemned",
-		text = { "In 5 rounds,", "Sacrifice this Joker", "Add 5 to the count of Sacrificed cards", "{C:red}+5{} Mult" },
+		text = {
+			"In {C:attention}#2#{} rounds,",
+			"{C:red}Sacrifice{} this Joker",
+			"Add {C:attention}5{} to the count of {C:red}Sacrifices{}",
+			"{C:red}+#1#{} Mult",
+		},
 	},
 	atlas = "Jokers",
 	rarity = 1,
@@ -411,25 +420,25 @@ SMODS.Joker({
 	unlocked = true,
 	discovered = true,
 	pos = {
-		x = 1,
-		y = 1,
+		x = 0,
+		y = 0,
 	},
 	config = {
 		extra = {
 			mult = 5,
-			count_round = 0,
+			count_round = 5,
 		},
 	},
 	loc_vars = function(self, info_queue, center)
 		return {
-			vars = { center.ability.extra.mult },
+			vars = { center.ability.extra.mult, self.config.extra.count_round },
 		}
 	end,
 	calculate = function(self, card, context)
 		if context.end_of_round and context.cardarea == G.jokers then
-			-- print("count_round:", card.ability.extra.count_round)
-			if card.ability.extra.count_round < 4 then
-				card.ability.extra.count_round = card.ability.extra.count_round + 1
+			if self.config.extra.count_round > 1 then
+				self.config.extra.count_round = self.config.extra.count_round - 1
+				print(self.config.extra.count_round)
 			else
 				card:remove()
 				SACRIFICED_CARDS = SACRIFICED_CARDS + 5
@@ -454,7 +463,7 @@ SMODS.Joker({
 		name = "Soulbinder",
 		text = {
 			"When blind is selected,",
-			"Sacrifice 1 random consumable card",
+			"{C:red}Sacrifice{} a random consumable card",
 			"Gain {C:red}+2{} Mult",
 			"{C:inactive}[Currently{} {C:red}+#1#{} {C:inactive}Mult]{}",
 		},
@@ -465,7 +474,7 @@ SMODS.Joker({
 	unlocked = true,
 	discovered = true,
 	pos = {
-		x = 2,
+		x = 3,
 		y = 1,
 	},
 	config = {
@@ -512,19 +521,18 @@ SMODS.Joker({
 		name = "Ritualist",
 		text = {
 			"When blind is selected,",
-			"Destroy the joker to the right",
-			"Add it's sell value to the count",
-			"of sacrificed cards (max 10)",
+			"Increase {C:red}Sacrifices{} by the",
+			"sell value of the Joker to the right",
 			"{C:inactive}[Currently #1# Sacrifices]{}",
 		},
 	},
 	atlas = "Jokers",
-	rarity = 1,
+	rarity = 3,
 	cost = 5,
 	unlocked = true,
 	discovered = true,
 	pos = {
-		x = 3,
+		x = 1,
 		y = 1,
 	},
 	loc_vars = function(self, info_queue, center)
@@ -552,7 +560,7 @@ SMODS.Joker({
 						sell_value = 10
 					end
 
-					right_joker:remove()
+					--right_joker:remove()
 
 					SACRIFICED_CARDS = SACRIFICED_CARDS + sell_value
 				end
@@ -582,7 +590,7 @@ SMODS.Joker({
 	unlocked = true,
 	discovered = true,
 	pos = {
-		x = 4,
+		x = 0,
 		y = 1,
 	},
 	config = {
@@ -634,7 +642,7 @@ SMODS.Consumable({
 	loc_txt = {
 		name = "The Ritual",
 		text = {
-			"Add {C:attention}2{} to the count of sacrificed cards",
+			"Add {C:attention}2{} to the count of {C:red}Sacrifices{}",
 			"{C:inactive}[Currently #1# Sacrifices]{}",
 		},
 	},
@@ -762,7 +770,7 @@ SMODS.Consumable({
 		name = "Possession",
 		text = {
 			"Apply {C:attention}Blood Seal{}",
-			"to #1# random cards",
+			"to {C:attention}#1#{} random cards",
 		},
 	},
 	atlas = "Possession",
@@ -836,7 +844,7 @@ SMODS.Seal({
 		name = "Blood Seal",
 		text = {
 			"Add twice the count",
-			"of sacrificed cards",
+			"of {C:red}Sacrifices{}",
 			"to the chip value",
 			"{C:inactive}[Currently #2# Sacrifices]{}",
 		},
@@ -976,7 +984,7 @@ SMODS.Booster({
 			{ key = "j_thecult_Martyr", weight = 2 },
 			{ key = "j_thecult_Condemned", weight = 3 },
 			{ key = "j_thecult_Soulbinder", weight = 1 },
-			{ key = "j_thecult_Ritualist", weight = 3 },
+			{ key = "j_thecult_Ritualist", weight = 1 },
 			{ key = "j_thecult_Pactbearer", weight = 1 },
 		}
 
@@ -1041,7 +1049,7 @@ SMODS.Back({
 	},
 	loc_txt = {
 		name = "The Cult",
-		text = { "Start with 1 {C:attention}Cultist{}" },
+		text = { "Start with a {C:attention}Cultist{}" },
 	},
 	apply = function()
 		G.E_MANAGER:add_event(Event({
